@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ScholarMatch AI
 ### Smart Scholarship Eligibility & Recommendation System for Indian Students
 
@@ -160,3 +161,6 @@ Visit **`http://localhost:8000`** in your browser.
 - **URL**: Click *"Admin"* in top navigation or visit the Admin tab
 - **Username**: `admin`
 - **Password**: `scholarmatch2026` *(or `admin123`)*
+=======
+# SCHOLOR-AI
+>>>>>>> a7d9a324b02ad05f712015fc676c18a2c84400ac
