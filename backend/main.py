@@ -40,6 +40,15 @@ app.add_middleware(
 def on_startup():
     init_db()
 
+@app.get("/")
+def root():
+    return {
+        "message": "ScholarMatch AI Backend API is running successfully!",
+        "docs": "/docs",
+        "health": "/api/health",
+        "scholarships": "/api/scholarships"
+    }
+
 @app.get("/api/health")
 def health_check():
     stats = get_dashboard_stats()
@@ -308,7 +317,9 @@ if os.path.exists(frontend_dist):
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        # Don't intercept API routes
+        # Don't intercept API routes or root
+        if not full_path or full_path == "":
+            return FileResponse(os.path.join(frontend_dist, "index.html"))
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API endpoint not found")
         file_path = os.path.join(frontend_dist, full_path)
