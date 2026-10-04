@@ -129,16 +129,16 @@ class ScholarshipMLEngine:
         else:
             category_match = 0.0
 
-        sch_gen = scholarship.get("gender", "All")
-        st_gen = profile.get("gender", "Female")
-        if sch_gen == "All" or sch_gen == "Male & Female":
+        sch_gen = str(scholarship.get("gender", "All")).strip().lower()
+        st_gen = str(profile.get("gender", "All")).strip().lower()
+        if not sch_gen or sch_gen in ["all", "any", "male & female", "both", "all genders"]:
             gender_match = 1.0
-        elif sch_gen == "Female Only" and st_gen == "Female":
-            gender_match = 1.0
-        elif sch_gen == "Male Only" and st_gen == "Male":
-            gender_match = 1.0
+        elif "female" in sch_gen or "girl" in sch_gen or "women" in sch_gen:
+            gender_match = 1.0 if ("female" in st_gen or "girl" in st_gen or "women" in st_gen) else 0.0
+        elif "male" in sch_gen or "boy" in sch_gen:
+            gender_match = 1.0 if ("male" in st_gen and not ("female" in st_gen)) else 0.0
         else:
-            gender_match = 0.0
+            gender_match = 1.0
 
         sch_ed = scholarship.get("education_level", "")
         st_ed = profile.get("education_level", "")

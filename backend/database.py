@@ -206,11 +206,12 @@ def query_scholarships(
             params.append(f"%{cat}%")
         conditions.append(f"({' OR '.join(cat_ors)})")
 
-    if gender and gender != "All":
-        if gender == "Female":
-            conditions.append("(gender = 'All' OR gender = 'Female Only' OR gender = 'Male & Female')")
-        elif gender == "Male":
-            conditions.append("(gender = 'All' OR gender = 'Male Only' OR gender = 'Male & Female')")
+    if gender and str(gender).strip().lower() != "all":
+        g_clean = str(gender).strip().lower()
+        if "female" in g_clean or "girl" in g_clean or "women" in g_clean:
+            conditions.append("(LOWER(gender) = 'all' OR LOWER(gender) LIKE '%female%' OR LOWER(gender) LIKE '%girl%' OR LOWER(gender) LIKE '%women%' OR LOWER(gender) = 'male & female')")
+        elif "male" in g_clean:
+            conditions.append("((LOWER(gender) = 'all' OR LOWER(gender) LIKE '%male%' OR LOWER(gender) = 'male & female') AND LOWER(gender) NOT LIKE '%female%' AND LOWER(gender) NOT LIKE '%girl%' AND LOWER(gender) NOT LIKE '%women%')")
 
     if provider_type and len(provider_type) > 0:
         p_placeholders = ",".join(["?"] * len(provider_type))
