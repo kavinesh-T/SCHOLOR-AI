@@ -1,6 +1,6 @@
 import { StudentProfile, ScholarshipRecord, RecommendationResponse, DashboardStats, DeadlinesData } from '../types';
 
-const API_BASE = '/api';
+const API_BASE = (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/+$/, '') : '') + '/api';
 
 export const api = {
   async getHealth(): Promise<{ status: string; service: string; ml_engine: string; ml_trained: boolean; database_records: number }> {
