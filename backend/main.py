@@ -17,7 +17,7 @@ from database import (
     get_dashboard_stats, insert_or_update_scholarship, delete_scholarship_by_id
 )
 from ml_engine import ml_engine
-from recommendation_engine import compute_recommendations_for_profile
+from recommendation_engine import compute_recommendations_for_profile, is_eligible
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -136,6 +136,13 @@ def predict_eligibility_for_scholarship(payload: Dict[str, Any]):
         raise HTTPException(status_code=404, detail="Scholarship not found")
         
     prediction = ml_engine.predict_match(profile, sch)
+    ok, reason = is_eligible(profile, sch)
+    if not ok:
+        prediction["eligibility_status"] = "Not Eligible"
+        prediction["match_score"] = min(35, prediction["match_score"])
+        if reason and reason not in prediction.get("reasons_ineligible", []):
+            prediction["reasons_ineligible"].insert(0, reason)
+
     return {
         "scholarship_id": scholarship_id,
         "scholarship_name": sch["scholarship_name"],
