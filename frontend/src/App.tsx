@@ -301,6 +301,8 @@ export const App: React.FC = () => {
             onToggleCompare={handleToggleCompare}
             comparedIds={comparedIds}
             initialCategoryQuery={initialCategoryQuery}
+            defaultGender={profile.gender}
+            defaultState={profile.state}
           />
         )}
 

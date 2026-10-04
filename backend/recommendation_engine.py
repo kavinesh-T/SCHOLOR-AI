@@ -9,30 +9,55 @@ from ml_engine import ml_engine
 from database import get_all_scholarships_raw
 
 
-def check_gender_eligibility(student_gender: str, scholarship_gender: str) -> bool:
+def check_gender_eligibility(student_gender: str, scholarship: Dict[str, Any]) -> bool:
     """
     Validates gender eligibility safely and case-insensitively.
-    - Male student: show scholarships with Gender = Male or All; cannot receive Female-only scholarship.
-    - Female student: show scholarships with Gender = Female or All; cannot receive Male-only scholarship.
+    Inspects BOTH the explicit gender field AND scholarship name, description, criteria, and tags.
+    - Male student: show scholarships with Gender = Male or All; CANNOT receive Female-only or girls/women schemes.
+    - Female student: show scholarships with Gender = Female or All; CANNOT receive Male-only schemes.
     - All-gender scholarship: eligible for all students.
     """
     st_g = str(student_gender or "").strip().lower()
-    sch_g = str(scholarship_gender or "All").strip().lower()
+    sch_g = str(scholarship.get("gender") or "All").strip().lower()
 
-    # Scholarship open to all genders
-    if not sch_g or sch_g in ["all", "any", "male & female", "both", "all genders", "all gender"]:
-        return True
+    # Extract all text associated with scholarship for semantic verification
+    text = (
+        str(scholarship.get("scholarship_name", "")) + " " +
+        str(scholarship.get("description", "")) + " " +
+        str(scholarship.get("eligibility_criteria", "")) + " " +
+        " ".join(scholarship.get("tags", []) if isinstance(scholarship.get("tags"), list) else [])
+    ).lower()
 
-    is_sch_female = "female" in sch_g or "girl" in sch_g or "women" in sch_g
-    is_sch_male = ("male" in sch_g and not is_sch_female) or "boy" in sch_g
+    # Keywords strictly designating women/girls schemes
+    female_keywords = [
+        "female only", "women in", "for women", "girl students", "for girls",
+        "girls in stem", "kanya", "beti", "mahila", "ladli", "women engineer",
+        "women higher education", "female candidate", "female applicant"
+    ]
+    is_female_scheme = (
+        any(kw in text for kw in female_keywords) or
+        ("female" in sch_g or "girl" in sch_g or "women" in sch_g)
+    )
+
+    # Keywords designating boys/male schemes
+    male_keywords = ["male only", "boys only", "for boys", "male students only"]
+    is_male_scheme = (
+        any(kw in text for kw in male_keywords) or
+        (("male" in sch_g and not is_female_scheme) or "boy" in sch_g)
+    )
+
+    # Explicit co-ed markers
+    if "male & female" in text or "both boys and girls" in text:
+        is_female_scheme = False
+        is_male_scheme = False
 
     if "female" in st_g or "girl" in st_g or "women" in st_g:
-        return not is_sch_male
+        return not is_male_scheme
     elif "male" in st_g or "boy" in st_g:
-        return not is_sch_female
+        return not is_female_scheme
     else:
         # Non-binary, unspecified, or other
-        return not (is_sch_female or is_sch_male)
+        return not (is_female_scheme or is_male_scheme)
 
 
 def check_education_level_eligibility(student_ed: str, scholarship_ed: str) -> bool:
@@ -122,27 +147,51 @@ def check_category_eligibility(student_category: str, scholarship_category: str)
     return False
 
 
-def check_state_eligibility(student_state: str, scholarship_state: str) -> bool:
+def check_state_eligibility(student_state: str, scholarship: Dict[str, Any]) -> bool:
     """
     Validates state domicile safely and case-insensitively.
+    - If scholarship is for another specific state (e.g. Maharashtra, Karnataka), disqualify.
+    - If scholarship has state 'All India' but explicitly targets another specific state, disqualify.
+    - Scholarships for student's own state or true 'All India' pass.
     """
-    if not scholarship_state:
-        return True
-    sch_s = str(scholarship_state).strip().lower()
-    if sch_s in ["all india", "all", "any", "national", "pan india"]:
-        return True
     if not student_state:
         return True
 
     st_s = str(student_state).strip().lower()
-    states = [s.strip().lower() for s in sch_s.split(",")]
+    sch_s = str(scholarship.get("state") or "All India").strip().lower()
 
-    for s in states:
-        if s in ["all india", "all", "any"]:
-            return True
-        if st_s == s or st_s in s or s in st_s:
-            return True
-    return False
+    # Recognized Indian states
+    indian_states = [
+        "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh",
+        "goa", "gujarat", "haryana", "himachal pradesh", "jharkhand", "karnataka",
+        "kerala", "madhya pradesh", "maharashtra", "manipur", "meghalaya", "mizoram",
+        "nagaland", "odisha", "punjab", "rajasthan", "sikkim", "tamil nadu",
+        "telangana", "tripura", "uttar pradesh", "uttarakhand", "west bengal", "delhi"
+    ]
+
+    # Explicit state list filtering
+    if sch_s not in ["all india", "all", "any", "national", "pan india"]:
+        states = [s.strip().lower() for s in sch_s.split(",")]
+        matched = False
+        for s in states:
+            if s in ["all india", "all", "any"] or st_s == s or st_s in s or s in st_s:
+                matched = True
+                break
+        if not matched:
+            return False
+
+    # Prevent another state's specific scholarship from slipping through with state='All India'
+    name_low = str(scholarship.get("scholarship_name", "")).lower()
+    crit_low = str(scholarship.get("eligibility_criteria", "")).lower()
+
+    for other_state in indian_states:
+        if other_state != st_s:
+            if f"domicile of {other_state}" in crit_low or f"residents of {other_state}" in crit_low or f"govt. of {other_state}" in crit_low:
+                return False
+            if other_state in name_low and st_s not in name_low:
+                return False
+
+    return True
 
 
 def check_marks_eligibility(student_marks: float, min_marks: float) -> bool:
@@ -157,16 +206,16 @@ def check_marks_eligibility(student_marks: float, min_marks: float) -> bool:
 def is_mandatory_eligible(profile: Dict[str, Any], scholarship: Dict[str, Any]) -> bool:
     """
     Enforces all mandatory eligibility criteria before a scholarship can be recommended:
-    - Gender (Male student cannot receive Female-only; Female student cannot receive Male-only)
+    - Gender (Male student cannot receive Female-only or girls/women schemes; Female student cannot receive Male-only)
     - Education Level
     - Course
     - Family Income
     - Category
-    - State
+    - State (Must match domicile state or be valid All-India)
     - Minimum Marks/CGPA
     """
-    # 1. Gender check
-    if not check_gender_eligibility(profile.get("gender"), scholarship.get("gender")):
+    # 1. Gender check (incorporating keywords and field)
+    if not check_gender_eligibility(profile.get("gender"), scholarship):
         return False
 
     # 2. Education level check
@@ -196,7 +245,7 @@ def is_mandatory_eligible(profile: Dict[str, Any], scholarship: Dict[str, Any]) 
         return False
 
     # 6. State check
-    if not check_state_eligibility(profile.get("state"), scholarship.get("state")):
+    if not check_state_eligibility(profile.get("state"), scholarship):
         return False
 
     # 7. Minimum marks check
@@ -219,17 +268,21 @@ def is_mandatory_eligible(profile: Dict[str, Any], scholarship: Dict[str, Any]) 
 def compute_recommendations_for_profile(profile: Dict[str, Any], sort_by: str = "best_match") -> Dict[str, Any]:
     all_scholarships = get_all_scholarships_raw()
 
-    # Step 1: Mandatory eligibility filtering and deduplication
+    # Step 1: Mandatory eligibility filtering and deduplication (by ID and normalized name)
     seen_ids = set()
+    seen_names = set()
     filtered_scholarships = []
 
     for sch in all_scholarships:
         sch_id = str(sch.get("scholarship_id", "")).strip()
-        if not sch_id or sch_id in seen_ids:
+        norm_name = "".join(ch for ch in str(sch.get("scholarship_name", "")).lower() if ch.isalnum())
+
+        if not sch_id or sch_id in seen_ids or norm_name in seen_names:
             continue
 
         if is_mandatory_eligible(profile, sch):
             seen_ids.add(sch_id)
+            seen_names.add(norm_name)
             filtered_scholarships.append(sch)
 
     # Step 2: Empty state handling when no scholarships satisfy mandatory criteria
@@ -264,15 +317,23 @@ def compute_recommendations_for_profile(profile: Dict[str, Any], sort_by: str = 
         else:
             not_eligible_count += 1
 
-    # Step 4: Sort recommendations according to selected criteria
-    if sort_by == "best_match":
-        evaluated_scholarships.sort(key=lambda s: (s["match_score"], s.get("scholarship_amount", 0)), reverse=True)
-    elif sort_by == "deadline":
-        evaluated_scholarships.sort(key=lambda s: s.get("days_left", 999))
-    elif sort_by == "amount":
-        evaluated_scholarships.sort(key=lambda s: s.get("scholarship_amount", 0), reverse=True)
-    elif sort_by == "newest":
-        evaluated_scholarships.sort(key=lambda s: s.get("scholarship_id", ""), reverse=True)
+    # Step 4: Sort recommendations with state prioritization
+    st_state_clean = str(profile.get("state", "")).strip().lower()
+
+    def sort_key(s):
+        # Prioritize scholarships belonging to the student's home state (e.g. Tamil Nadu)
+        is_home_state = 1 if (st_state_clean and st_state_clean in str(s.get("state", "")).lower() and "all india" not in str(s.get("state", "")).lower()) else 0
+        if sort_by == "best_match":
+            return (is_home_state, s.get("match_score", 0), s.get("scholarship_amount", 0))
+        elif sort_by == "deadline":
+            return (is_home_state, -s.get("days_left", 999))
+        elif sort_by == "amount":
+            return (is_home_state, s.get("scholarship_amount", 0))
+        elif sort_by == "newest":
+            return (is_home_state, s.get("scholarship_id", ""))
+        return (is_home_state, s.get("match_score", 0))
+
+    evaluated_scholarships.sort(key=sort_key, reverse=True)
 
     if eligible_count > 0:
         top_scores = [s["match_score"] for s in evaluated_scholarships[:10] if s["eligibility_status"] == "Eligible"]

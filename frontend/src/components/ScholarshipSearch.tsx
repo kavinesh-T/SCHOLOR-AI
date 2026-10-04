@@ -23,6 +23,8 @@ interface ScholarshipSearchProps {
   onToggleCompare: (scholarship: ScholarshipRecord) => void;
   comparedIds: string[];
   initialCategoryQuery?: string;
+  defaultGender?: string;
+  defaultState?: string;
 }
 
 export const ScholarshipSearch: React.FC<ScholarshipSearchProps> = ({
@@ -31,7 +33,9 @@ export const ScholarshipSearch: React.FC<ScholarshipSearchProps> = ({
   savedIds,
   onToggleCompare,
   comparedIds,
-  initialCategoryQuery
+  initialCategoryQuery,
+  defaultGender,
+  defaultState
 }) => {
   const [scholarships, setScholarships] = useState<ScholarshipRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -45,9 +49,9 @@ export const ScholarshipSearch: React.FC<ScholarshipSearchProps> = ({
     query: initialCategoryQuery || '',
     education_levels: [],
     courses: [],
-    state: 'All India',
+    state: defaultState && defaultState !== 'All India' ? defaultState : 'All India',
     categories: [],
-    gender: 'All',
+    gender: defaultGender && defaultGender !== 'All' ? defaultGender : 'All',
     provider_types: [],
     max_income: 1000000,
     min_marks: 0,

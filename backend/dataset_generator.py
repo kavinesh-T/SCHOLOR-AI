@@ -727,7 +727,7 @@ def generate_500_scholarships() -> List[Dict[str, Any]]:
     # 2b. Generate Corporate & Foundation CSR Scholarships (approx 150 records)
     for corp, scheme in corporate_names:
         for variation in ["National Merit Stream", "Diversity & Women in STEM", "Rural First-Gen College Grant"]:
-            gender_val = "Female Only" if "Women" in variation or "Girls" in scheme else "All"
+            gender_val = "Female Only" if ("Women" in variation or "Women" in scheme or "Girls" in scheme or "Kanya" in scheme or "Beti" in scheme) else "All"
             is_rural = "Yes" if "Rural" in variation else "No"
             cat_val = "SC, ST, OBC, EWS" if "Diversity" in variation else "All"
             inc_limit = 350000.0 if "Rural" in variation else 600000.0
