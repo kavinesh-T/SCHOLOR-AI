@@ -72,6 +72,7 @@ export interface RecommendationSummary {
 export interface RecommendationResponse {
   summary: RecommendationSummary;
   recommendations: ScholarshipRecord[];
+  message?: string;
 }
 
 export interface DashboardStats {
